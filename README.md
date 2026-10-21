@@ -1,36 +1,127 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EventPlanner
 
-## Getting Started
+Create events, share one invite link and see who is coming. Guests reply without creating an account.
 
-First, run the development server:
+## Features
+
+- Sign in and account management with Neon Auth
+- Create events with a title, description, place and date
+- Dashboard with all your events and reply counts (going, maybe, can't go)
+- One invite link per event, which you can regenerate at any time
+- Public invite page where guests reply with name, email and status
+- Attendee table on the event page
+
+## Tech stack
+
+- [Next.js 16](https://nextjs.org) (App Router, Cache Components)
+- [React](https://react.dev) and [Tailwind CSS v4](https://tailwindcss.com)
+- [shadcn/ui](https://ui.shadcn.com) components
+- [Prisma 7](https://www.prisma.io) with the `pg` driver adapter
+- [Neon](https://neon.tech) Postgres and Neon Auth
+- [pnpm](https://pnpm.io) and [Vite+](https://viteplus.dev) for tooling and pre-commit checks
+
+## Getting started
+
+### Requirements
+
+- Node.js 24 or newer
+- pnpm
+- A Neon project (database and Neon Auth enabled)
+
+### 1. Install dependencies
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+If pnpm reports `ERR_PNPM_IGNORED_BUILDS`, approve the build scripts for `prisma`, `@prisma/engines` and `esbuild`:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm approve-builds
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 2. Configure environment variables
 
-## Learn More
+Create a `.env` file in the project root:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+# Neon Postgres. Use the direct (non-pooled) URL for migrations.
+DATABASE_URL="postgresql://user:password@host/dbname?sslmode=require"
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Public URL of the app, used to build invite links
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Neon Auth variables: copy them from the Auth page of your Neon project
+```
 
-## Deploy on Vercel
+Never commit `.env`. It is listed in `.gitignore`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 3. Set up the database
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+pnpm prisma migrate dev
+pnpm prisma generate
+```
+
+The Prisma client is generated into `app/generated/prisma`. Run `pnpm prisma generate` again after every schema change.
+
+### 4. Start the dev server
+
+```bash
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+> Run the app with `pnpm dev`, not `vp dev`. `vp dev` starts a Vite server, which this Next.js project does not use.
+
+## Scripts
+
+| Command                   | What it does                 |
+| ------------------------- | ---------------------------- |
+| `pnpm dev`                | Start the development server |
+| `pnpm build`              | Create a production build    |
+| `pnpm start`              | Run the production build     |
+| `pnpm exec tsc --noEmit`  | Type-check the project       |
+| `pnpm prisma migrate dev` | Create and apply a migration |
+| `pnpm prisma studio`      | Browse the database          |
+
+A pre-commit hook runs `vp check --fix` on staged files. Commits fail on lint or type errors, so run `pnpm exec tsc --noEmit` before committing.
+
+## Project structure
+
+```
+app/
+  auth/[path]/       Sign in, sign up and other auth views
+  account/[path]/    Account settings views
+  dashboard/         List of your events
+  events/new/        Create event form
+  events/[eventId]/  Event details, invite link, attendees
+  invite/[token]/    Public RSVP page for guests
+  generated/prisma/  Generated Prisma client (not committed)
+components/          App components and shadcn/ui (components/ui)
+lib/
+  actions/           Server Actions (create event, invite link, RSVP)
+  auth/              Neon Auth server and client setup
+  prisma.ts          Prisma client singleton
+prisma/
+  schema.prisma      Data model
+proxy.ts             Route protection (Next.js 16 replacement for middleware)
+```
+
+## Data model
+
+- **Event**: owned by a Neon Auth user (`ownerUserId`), with title, description, location and date
+- **EventInvite**: one invite token per event
+- **EventRsvp**: a guest reply with name, email and status (`going`, `maybe`, `not_going`)
+
+## Notes
+
+- The project uses Cache Components. Any page that reads the session, `params`, `searchParams` or the database must do so inside a `<Suspense>` boundary.
+- Server Actions that filter by owner must check the session first. An `undefined` user id would otherwise drop the filter from the Prisma query.
+- Regenerating an invite link invalidates the previous one.
+- `proxy.ts` protects the dashboard and event routes. The home page, `/auth/*` and `/invite/*` stay public.
+
+## Deployment
+
+Deploy to any platform that supports Next.js, for example Vercel. Set `DATABASE_URL`, `NEXT_PUBLIC_APP_URL` and the Neon Auth variables in the project settings, and run `pnpm prisma migrate deploy` against the production database.
