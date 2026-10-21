@@ -19,6 +19,7 @@ model Event{
     createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
     updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamp(6)
     invite EventInvite?
+    rsvps EventRsvp[]
     @@index([ownerUserId,createdAt(sort:Desc)],map:"idx_event_owner")
     @@map("events")
 }
@@ -29,6 +30,7 @@ model EventInvite{
     token String @unique
     createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
     event Event @relation(fields:[eventId],references:[id],onDelete: Cascade)
+    rsvps EventRsvp[]
     @@map("event_invites")
 }
 
@@ -49,7 +51,8 @@ model EventRsvp{
     respondedAt DateTime @default(now()) @map("responded_at") @db.Timestamp(6)
     createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
     updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamp(6)
-    //event Event @relation(fields:[eventId],references:[id],onDelete: Cascade)
+    event Event @relation(fields:[eventId],references:[id],onDelete: Cascade)
+    invite EventInvite? @relation(fields:[inviteId],references:[id],onDelete: SetNull)
     @@unique([eventId,emailNormalized])
     @@index([eventId,createdAt(sort:Desc)],map:"idx_event_rsvp_event")
     @@map("event_rsvps")
